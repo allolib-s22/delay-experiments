@@ -18,6 +18,9 @@
 
 using namespace gam;
 
+using namespace std;
+#include <iostream>
+
 // using namespace gam;
 using namespace al;
 
@@ -34,9 +37,6 @@ public:
     gam::Sine<> mOsc;
     gam::Env<3> mAmpEnv;
 
-    Delay<> delay; // Delay line
-    OnePole<> lpf;
-
     // envelope follower to connect audio output to graphics
     gam::EnvFollow<> mEnvFollow;
 
@@ -47,14 +47,6 @@ public:
     // it is created. Voices will be reused if they are idle.
     void init() override
     {
-
-        // Initialize Delay
-
-        delay.maxDelay(1.0);
-
-        // Set up low-pass filter
-        lpf.type(gam::LOW_PASS);
-        lpf.freq(2000);
 
         // Intialize envelope
         mAmpEnv.curve(0); // make segments lines
@@ -93,15 +85,15 @@ public:
         while (io())
         {
 
-            float echo = delay();
-            echo = lpf(echo) * 0.8;
+            // float echo = delay();
+            // echo = lpf(echo) * 0.8;
 
             float s1 = mOsc() * mAmpEnv() * getInternalParameterValue("amplitude");
             float s2;
             mEnvFollow(s1);
 
-            delay(s1 + echo);
-            s1 += echo;
+            // delay(s1 + echo);
+            // s1 += echo;
 
             mPan(s1, s1, s2);
             io.out(0) += s1;
@@ -147,12 +139,24 @@ public:
     // where the presets and sequences are stored
     SynthGUIManager<SineEnv> synthManager{"SineEnv"};
 
+    Delay<> delay; // Delay line
+    OnePole<> lpf;
+
     // This function is called right after the window is created
     // It provides a grphics context to initialize ParameterGUI
     // It's also a good place to put things that should
     // happen once at startup.
     void onCreate() override
     {
+
+        // Initialize Delay
+
+        delay.maxDelay(1.0);
+
+        // Set up low-pass filter
+        lpf.type(gam::LOW_PASS);
+        lpf.freq(2000);
+
         navControl().active(false); // Disable navigation via keyboard, since we
                                     // will be using keyboard for note triggering
 
@@ -168,6 +172,22 @@ public:
     void onSound(AudioIOData &io) override
     {
         synthManager.render(io); // Render audio
+
+        io.frame(0);
+
+        while (io())
+        {
+            float s1 = io.out(0);
+            float delaySample = delay();
+            float echo = lpf(delaySample) * 0.8;
+
+            //cout << s1 << " " << delaySample << " " << echo << endl;
+
+            delay(s1 + echo);
+
+            io.out(0) += echo;
+        }
+
     }
 
     void onAnimate(double dt) override
